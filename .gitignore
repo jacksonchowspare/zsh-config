@@ -1,0 +1,6 @@
+# 本机私有配置，不进版本库
+local.zsh
+
+# zsh 运行时产物
+.zcompdump*
+.zsh_history
