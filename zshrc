@@ -75,7 +75,9 @@ FZF_DEFAULT_COMMAND='rg --files --hidden --glob "!.git/*"'
 FZF_CTRL_T_COMMAND=$FZF_DEFAULT_COMMAND
 FZF_DEFAULT_OPTS='--height 45% --layout=reverse --border --info=inline'
 FZF_CTRL_T_OPTS='--preview "batcat --style=numbers --color=always --line-range=:200 {}"'
-if command -v fzf >/dev/null; then
+if command -v fzf >/dev/null && [[ -t 0 ]]; then
+  # [[ -t 0 ]]：只在真终端里装键位。非 tty 的交互式调用下，Debian 版 fzf 脚本
+  # 会用 eval 恢复选项并试图打开 zle 选项，报 "can't change option: zle"，纯噪音。
   for _f in /usr/share/doc/fzf/examples/key-bindings.zsh /usr/share/fzf/key-bindings.zsh; do
     [[ -r $_f ]] && { source "$_f"; break; }
   done
