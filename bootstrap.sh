@@ -222,12 +222,19 @@ else
   warn "没有 fc-list（fontconfig 未装），无法探测字体"
 fi
 
+HEADLESS=0
+if [ -z "${DISPLAY:-}" ] && [ -z "${WAYLAND_DISPLAY:-}" ]; then HEADLESS=1; fi
+
 FAMILY_OK=0
 if [ "$FCLIST_OK" = 1 ] && fc-list 2>/dev/null | grep -qi "$FONT_FAMILY"; then FAMILY_OK=1; fi
 
 if [ "$NERD_OK" = 0 ] || { [ "$FONT_EXPLICIT" = 1 ] && [ "$FAMILY_OK" = 0 ]; }; then
   if [ "$DO_FONT" = 0 ]; then
     warn "已按 --no-font 跳过；缺 Nerd Font 时语言段图标会显示成方块"
+  elif [ "$HEADLESS" = 1 ] && [ "$FONT_EXPLICIT" = 0 ]; then
+    warn "无桌面环境（headless）：字符是在你本地终端/SSH 客户端里渲染的，字体装在服务器上不起作用 → 跳过安装"
+    say "   正确做法：把 Nerd Font 装在【你用的那台客户端设备】上，并在客户端设置里选中它"
+    say "   确实需要在服务器上装（有 GUI 或另有用途）：加参数 --font $FONT_FAMILY"
   elif [ "$DRY_RUN" = 1 ]; then
     say "   将下载 $FONT_FAMILY（Nerd Fonts 官方发布）装到 $FONT_DIR，然后 fc-cache -f"
   else
