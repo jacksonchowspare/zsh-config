@@ -6,6 +6,7 @@
 #
 #  必需（都是 apt 官方包）: zsh, zsh-syntax-highlighting, zsh-autosuggestions
 #  可选（缺了只提示一行、不影响启动）: fzf, zoxide, eza, batcat
+#  提示符: starship（可选；配置是本目录的 starship.toml，缺了会自动退回内置提示符）
 #  设计原则: 启动不联网; 任何可选组件缺失都降级运行而不是报错
 # ══════════════════════════════════════════════════════════════════
 
@@ -121,9 +122,36 @@ alias gl='git log --oneline --graph --decorate -20'
 _zsh_load zsh-syntax-highlighting /usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
 
 # ── 11. 提示符 ──────────────────────────────────────────────────
-# 绿色 user@host、蓝色路径，上一条命令失败时红字标出退出码
-# （未启用 starship；将来想用，在文件末尾加一行转调它即可，不影响现有配置）
-PROMPT='%F{green}%n@%m%f:%F{blue}%~%f%(?.. %F{red}✘%?%f) $ '
+# 优先用 starship（配置放在本仓库里：~/.config/zsh/starship.toml）；
+# 没有 starship 可执行文件时，自动退回下面的内置提示符，不至于没提示符可用。
+_prompt_plain() {
+  PROMPT='%F{green}%n@%m%f:%F{blue}%~%f%(?.. %F{red}✘%?%f) $ '
+}
+
+if [[ -r ${ZDOTDIR:-$HOME}/.config/zsh/starship.toml ]]; then
+  export STARSHIP_CONFIG=${ZDOTDIR:-$HOME}/.config/zsh/starship.toml
+fi
+
+if command -v starship >/dev/null 2>&1; then
+  source <(starship init zsh)
+  # 保险丝：starship 二进制若在会话中途消失（被删/不可执行），
+  # 自动摘掉它的钩子并退回内置提示符，避免"提示符画不出来、终端看着像冻死"
+  _starship_fuse() {
+    if [[ ! -x ${commands[starship]:-} ]]; then
+      add-zsh-hook -d precmd prompt_starship_precmd 2>/dev/null
+      add-zsh-hook -d precmd starship_precmd 2>/dev/null
+      add-zsh-hook -d preexec prompt_starship_preexec 2>/dev/null
+      precmd_functions=(${precmd_functions:#_starship_fuse})
+      RPROMPT=''
+      _prompt_plain
+      unset -f _starship_fuse
+    fi
+  }
+  autoload -Uz add-zsh-hook
+  precmd_functions=(_starship_fuse $precmd_functions)   # 排在 starship 的钩子之前检查
+else
+  _prompt_plain
+fi
 
 # ── 12. 本机私有配置（不进 git，放临时 export / 内网别名）───────
 [[ -r ${ZDOTDIR:-$HOME}/.config/zsh/local.zsh ]] && source ${ZDOTDIR:-$HOME}/.config/zsh/local.zsh
