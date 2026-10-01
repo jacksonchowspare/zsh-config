@@ -222,8 +222,22 @@ else
   warn "没有 fc-list（fontconfig 未装），无法探测字体"
 fi
 
-HEADLESS=0
-if [ -z "${DISPLAY:-}" ] && [ -z "${WAYLAND_DISPLAY:-}" ]; then HEADLESS=1; fi
+# 判断本机有没有桌面环境：决定要不要在这台机器上装字体。
+# 注意不能只看 DISPLAY/WAYLAND_DISPLAY —— 人在 ssh 里跑时它们是空的，
+# 但机器可能正是桌面机本身，所以再查一次图形会话。
+HEADLESS=1
+if [ -n "${DISPLAY:-}" ] || [ -n "${WAYLAND_DISPLAY:-}" ]; then
+  HEADLESS=0
+elif [ -S "/run/user/$(id -u)/wayland-0" ]; then
+  HEADLESS=0
+elif command -v loginctl >/dev/null 2>&1; then
+  for _s in $(loginctl list-sessions --no-legend 2>/dev/null | awk '{print $1}'); do
+    case "$(loginctl show-session "$_s" -p Type --value 2>/dev/null)" in
+      wayland|x11) HEADLESS=0; break ;;
+    esac
+  done
+fi
+[ "${BOOTSTRAP_DEBUG:-0}" = "1" ] && echo "   [调试] 桌面环境判定: $([ "$HEADLESS" = 1 ] && echo headless\(无桌面\) || echo desktop\(有桌面\))"
 
 FAMILY_OK=0
 if [ "$FCLIST_OK" = 1 ] && fc-list 2>/dev/null | grep -qi "$FONT_FAMILY"; then FAMILY_OK=1; fi
