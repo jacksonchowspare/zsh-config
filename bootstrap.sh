@@ -13,6 +13,7 @@
 #     --os-release FILE   指定 os-release 文件（默认 /etc/os-release）
 #     --zsh PATH          用于自检的 zsh（默认自动探测）
 #     --repo DIR          配置仓库位置（默认脚本所在目录）
+#     --pkg-manager NAME  强制指定包管理器（演练用：apt-get/dnf/pacman/zypper/brew）
 # ══════════════════════════════════════════════════════════════════
 set -u
 
