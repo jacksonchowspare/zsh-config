@@ -14,6 +14,12 @@
 #     --zsh PATH          用于自检的 zsh（默认自动探测）
 #     --repo DIR          配置仓库位置（默认脚本所在目录）
 #     --pkg-manager NAME  强制指定包管理器（演练用：apt-get/dnf/pacman/zypper/brew）
+#
+#  字体相关：
+#     --font NAME         要装的 Nerd Font 家族（默认 0xProto；也支持 JetBrainsMono/FiraCode/Hack 等）
+#     --no-font           跳过字体安装
+#     --font-dir DIR      字体安装目录（默认 ~/.local/share/fonts/<家族>）
+#     --set-terminal-font 顺手把 GNOME 系终端（Ptyxis / GNOME Terminal）的字体也设为它
 # ══════════════════════════════════════════════════════════════════
 set -u
 
@@ -23,6 +29,11 @@ OS_RELEASE="/etc/os-release"
 DRY_RUN=0; DO_PKGS=1; DO_CHSH=1
 ZSH_BIN=""
 PKG_FORCE=""
+DO_FONT=1
+FONT_FAMILY="0xProto"
+FONT_DIR=""
+SET_TERM_FONT=0
+FONT_EXPLICIT=0
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -33,6 +44,10 @@ while [ $# -gt 0 ]; do
     --os-release)  OS_RELEASE="$2";  shift ;;
     --zsh)         ZSH_BIN="$2";     shift ;;
     --pkg-manager) PKG_FORCE="$2";  shift ;;   # 演练用：强制指定包管理器
+    --font)        FONT_FAMILY="$2"; FONT_EXPLICIT=1; shift ;;  # 字体家族，对应 Nerd Fonts 发布名：0xProto / JetBrainsMono / FiraCode ...
+    --no-font)     DO_FONT=0 ;;
+    --font-dir)    FONT_DIR="$2";    shift ;;  # 字体安装目录（默认 ~/.local/share/fonts/<家族>）
+    --set-terminal-font) SET_TERM_FONT=1 ;;    # 顺手把 GNOME 系终端的字体也设成它
     --repo)        REPO_DIR="$2";    shift ;;
     -h|--help)     sed -n '2,18p' "$0"; exit 0 ;;
     *) echo "未知参数: $1（用 --help 看用法）" >&2; exit 2 ;;
@@ -59,6 +74,8 @@ say "   架构     : $(uname -m)  内核 $(uname -s)"
 say "   目标家目录: $TARGET_HOME"
 say "   配置仓库 : $REPO_DIR"
 
+[ -z "$FONT_DIR" ] && FONT_DIR="$TARGET_HOME/.local/share/fonts/$FONT_FAMILY"
+
 PKG=""
 if [ -n "$PKG_FORCE" ]; then
   PKG="$PKG_FORCE"
@@ -70,8 +87,8 @@ fi
 say "   包管理器 : ${PKG:-未识别}"
 
 case "$PKG" in
-  apt-get|dnf) PKGS="zsh zsh-syntax-highlighting zsh-autosuggestions fzf zoxide eza bat ripgrep fd-find" ;;
-  pacman|zypper|brew) PKGS="zsh zsh-syntax-highlighting zsh-autosuggestions fzf zoxide eza bat ripgrep fd" ;;
+  apt-get|dnf) PKGS="zsh zsh-syntax-highlighting zsh-autosuggestions fzf zoxide eza bat ripgrep fd-find fontconfig" ;;
+  pacman|zypper|brew) PKGS="zsh zsh-syntax-highlighting zsh-autosuggestions fzf zoxide eza bat ripgrep fd" ;;  # 这几个发行版自带 fontconfig
   *) PKGS="" ;;
 esac
 say "   依赖包   : ${PKGS:-（无法确定，请手动安装 zsh / 高亮 / 自动建议 / fzf / zoxide / eza / bat / ripgrep / fd）}"
@@ -189,17 +206,86 @@ else
 fi
 
 # ── 7. Nerd Font 检查 ───────────────────────────────────────────
-step "7. 字体"
-if command -v fc-list >/dev/null 2>&1; then
-  if fc-list 2>/dev/null | grep -qi 'nerd font'; then
-    ok "系统里有 Nerd Font: $(fc-list 2>/dev/null | grep -i 'nerd font' | head -1 | cut -d: -f2 | sed 's/^ *//')"
+step "7. 字体（Nerd Font）"
+FCLIST_OK=1
+command -v fc-list >/dev/null 2>&1 || FCLIST_OK=0
+[ "${BOOTSTRAP_FORCE_NO_FCLIST:-0}" = "1" ] && FCLIST_OK=0     # 演练用：强制走"没有 fc-list"分支
+NERD_OK=0
+if [ "$FCLIST_OK" = 1 ]; then
+  if fc-list 2>/dev/null | grep -qi "nerd font"; then
+    NERD_OK=1
+    ok "已有 Nerd Font: $(fc-list 2>/dev/null | grep -i "nerd font" | head -1 | cut -d: -f2 | sed "s/^ *//")"
   else
-    warn "没找到 Nerd Font：语言段图标可能显示成方块。"
-    warn "装一个即可（例如 0xProto / JetBrainsMono Nerd Font），并在终端设置里选中它"
+    warn "系统里没有任何 Nerd Font 字体"
   fi
 else
-  warn "没有 fc-list（fontconfig 未装），无法自动检查字体"
-  warn "想启用检查: sudo apt install fontconfig；否则请自行确认终端字体是 Nerd Font，不然语言段图标会显示成方块"
+  warn "没有 fc-list（fontconfig 未装），无法探测字体"
+fi
+
+FAMILY_OK=0
+if [ "$FCLIST_OK" = 1 ] && fc-list 2>/dev/null | grep -qi "$FONT_FAMILY"; then FAMILY_OK=1; fi
+
+if [ "$NERD_OK" = 0 ] || { [ "$FONT_EXPLICIT" = 1 ] && [ "$FAMILY_OK" = 0 ]; }; then
+  if [ "$DO_FONT" = 0 ]; then
+    warn "已按 --no-font 跳过；缺 Nerd Font 时语言段图标会显示成方块"
+  elif [ "$DRY_RUN" = 1 ]; then
+    say "   将下载 $FONT_FAMILY（Nerd Fonts 官方发布）装到 $FONT_DIR，然后 fc-cache -f"
+  else
+    [ "$NERD_OK" = 1 ] && say "   系统已有其它 Nerd Font，但你要的是 $FONT_FAMILY，按你的要求安装"
+    TMPZ="/tmp/nerdfont-$$.zip"
+    URL="https://github.com/ryanoasis/nerd-fonts/releases/latest/download/$FONT_FAMILY.zip"
+    say "   下载 $URL"
+    if curl -fsSL --connect-timeout 10 --max-time 300 -o "$TMPZ" "$URL" 2>/dev/null && [ -s "$TMPZ" ]; then
+      ok "下载完成: $(du -h "$TMPZ" | cut -f1)"
+      mkdir -p "$FONT_DIR"
+      UNPACKED=0
+      if command -v unzip >/dev/null 2>&1; then
+        unzip -oq "$TMPZ" -d "$FONT_DIR" && UNPACKED=1
+      elif command -v python3 >/dev/null 2>&1; then
+        python3 -c "import zipfile,sys; zipfile.ZipFile(sys.argv[1]).extractall(sys.argv[2])" "$TMPZ" "$FONT_DIR" && UNPACKED=1
+      elif command -v bsdtar >/dev/null 2>&1; then
+        bsdtar -xf "$TMPZ" -C "$FONT_DIR" && UNPACKED=1
+      fi
+      rm -f "$TMPZ"
+      if [ "$UNPACKED" = 1 ]; then
+        ok "字体已装到 $FONT_DIR（OFL 许可证文件随字体一起保留）"
+        if command -v fc-cache >/dev/null 2>&1; then
+          fc-cache -f >/dev/null 2>&1 && ok "字体缓存已重建"
+        else
+          warn "没有 fc-cache，需要重新登录或重启桌面后系统才会认到新字体"
+        fi
+        if [ "$FCLIST_OK" = 1 ] && fc-list 2>/dev/null | grep -qi "$FONT_FAMILY"; then
+          ok "系统已识别: $(fc-list 2>/dev/null | grep -i "$FONT_FAMILY" | head -1 | cut -d: -f2 | sed "s/^ *//")"
+        fi
+      else
+        warn "没有可用的解压工具（unzip / python3 / bsdtar 都没有）"
+        warn "手动方案: sudo apt install unzip 后重跑本脚本"
+      fi
+    else
+      warn "下载失败（网络或代理问题）"
+      warn "手动方案: 打开 $URL 下载解压，把 ttf 放进 $FONT_DIR，再执行 fc-cache -f"
+    fi
+  fi
+fi
+
+# 字体装上了不等于终端在用 —— 顺手看一眼 GNOME 系终端的设置
+if command -v dconf >/dev/null 2>&1; then
+  PTY_FONT="$(dconf read /org/gnome/Ptyxis/font-name 2>/dev/null | tr -d "'")"
+  if [ -n "$PTY_FONT" ]; then
+    say "   终端（Ptyxis）当前字体: $PTY_FONT"
+    case "$PTY_FONT" in
+      *[Nn]erd*) ok "   → 已经是 Nerd Font，图标能正常显示" ;;
+      *) warn "   → 不是 Nerd Font，图标会变方块"
+         if [ "$SET_TERM_FONT" = 1 ] && [ "$DRY_RUN" = 0 ]; then
+           dconf write /org/gnome/Ptyxis/font-name "'$FONT_FAMILY Nerd Font Mono 14'" 2>/dev/null \
+             && ok "   已设为 $FONT_FAMILY Nerd Font Mono 14（新开窗口生效）" \
+             || warn "   设置失败，请手动在终端设置里选字体"
+         else
+           say "   改法: dconf write /org/gnome/Ptyxis/font-name \"'$FONT_FAMILY Nerd Font Mono 14'\""
+           say "   或加参数 --set-terminal-font 让脚本替你改"
+         fi ;;
+    esac
+  fi
 fi
 
 # ── 8. 自检 ─────────────────────────────────────────────────────
