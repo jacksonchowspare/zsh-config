@@ -198,7 +198,8 @@ if command -v fc-list >/dev/null 2>&1; then
     warn "装一个即可（例如 0xProto / JetBrainsMono Nerd Font），并在终端设置里选中它"
   fi
 else
-  warn "没有 fc-list，无法检查字体"
+  warn "没有 fc-list（fontconfig 未装），无法自动检查字体"
+  warn "想启用检查: sudo apt install fontconfig；否则请自行确认终端字体是 Nerd Font，不然语言段图标会显示成方块"
 fi
 
 # ── 8. 自检 ─────────────────────────────────────────────────────
@@ -220,10 +221,11 @@ elif [ -x "$ZSH_PATH" ]; then
   echo "$OUT"
   ERR="$(env HOME="$TARGET_HOME" PATH="$TARGET_HOME/.local/bin:$PATH" "$ZSH_PATH" -i -c 'exit' 2>&1)"
   if [ -n "$ERR" ]; then warn "加载时有输出（可能有问题）:"; echo "$ERR" | sed 's/^/     /'; else ok "加载零报错"; fi
-  case "$-" in
-    *i*) : ;;
-    *) warn "非交互环境跑的自检：ZLE 相关项（fzf 键位、自动建议）显示未加载属正常，请开一个真终端再验" ;;
-  esac
+  if [ ! -t 0 ]; then
+    warn "这次自检的 stdin 不是终端：ZLE 相关项若显示未加载属正常，请在真终端里再验一次"
+  elif ! echo "$OUT" | grep -q "已就绪"; then
+    warn "在真终端里跑的，但 ZLE 相关项没就绪 —— 检查 zsh-syntax-highlighting / zsh-autosuggestions 是否装上"
+  fi
 elif [ "$ZSH_BIN" = "" ]; then
   warn "没找到 zsh，无法自检"
 fi
