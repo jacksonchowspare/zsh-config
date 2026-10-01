@@ -2,6 +2,9 @@
 # ══════════════════════════════════════════════════════════════════
 #  bootstrap.sh — 在一台新机器上装好这套 zsh 环境
 #
+#  说明：apt 安装时通过环境变量禁用 needrestart 的自动重启，
+#        不会因为你装个字体/插件就把 nginx、面板之类的服务重启一遍。
+#
 #  在配置仓库目录里执行：
 #     bash bootstrap.sh                 # 装依赖 + 放好配置 + 改登录 shell
 #     bash bootstrap.sh --dry-run       # 只打印要做什么，不动系统
@@ -102,7 +105,7 @@ elif [ -z "$PKG" ] || [ -z "$PKGS" ]; then
 else
   pkg_install() {
     case "$PKG" in
-      apt-get) run sudo apt-get install -y "$@" ;;
+      apt-get) run sudo env NEEDRESTART_SUSPEND=1 NEEDRESTART_MODE=l apt-get install -y "$@" ;;
       dnf)     run sudo dnf install -y "$@" ;;
       pacman)  run sudo pacman -S --needed --noconfirm "$@" ;;
       zypper)  run sudo zypper install -y "$@" ;;
@@ -114,7 +117,22 @@ else
     apt-get|dnf) PKGS_OPT="fzf zoxide eza bat ripgrep fd-find fontconfig" ;;
     *)           PKGS_OPT="fzf zoxide eza bat ripgrep fd fontconfig" ;;
   esac
-  case "$PKG" in apt-get) run sudo apt-get update ;; esac
+  if [ "$PKG" = "apt-get" ] && command -v apt-cache >/dev/null 2>&1; then
+    _avail=""; _missing=""
+    for _p in $PKGS_OPT; do
+      if apt-cache show "$_p" >/dev/null 2>&1; then _avail="$_avail $_p"; else _missing="$_missing $_p"; fi
+    done
+    [ -n "$_missing" ] && warn "仓库里没有这些包，已从清单剔除:$_missing"
+    PKGS_OPT="$_avail"
+    case " $PKGS_OPT " in
+      *" eza "*) : ;;
+      *) if apt-cache show exa >/dev/null 2>&1; then
+           say "   用 exa 代替 eza（配置里已内置 exa 回退，现代版 ls 照常可用）"
+           PKGS_OPT="$PKGS_OPT exa"
+         fi ;;
+    esac
+  fi
+  case "$PKG" in apt-get) run sudo env NEEDRESTART_SUSPEND=1 NEEDRESTART_MODE=l apt-get update ;; esac
   say "   必需: $PKGS_REQ"
   pkg_install $PKGS_REQ || warn "必需包没装上，请手动安装 zsh 与两个插件包"
   say "   可选: $PKGS_OPT"
@@ -125,8 +143,12 @@ else
     done
   fi
   if ! command -v eza >/dev/null 2>&1; then
-    warn "没有 eza（Ubuntu 22.04 及更早的仓库里没有这个包）"
-    say "   可改用 exa: sudo apt install -y exa（配置里已内置 exa 回退，装了就能用现代版 ls）"
+    if command -v exa >/dev/null 2>&1; then
+      ok "用 exa 代替 eza，现代版 ls/ll/la/lt 照常可用"
+    else
+      warn "既没有 eza 也没有 exa：ls 走系统原生版本，其它功能不受影响"
+      case "$PKG" in apt-get) say "   想补上: sudo apt install -y exa" ;; esac
+    fi
   fi
 fi
 
