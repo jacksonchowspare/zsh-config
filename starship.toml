@@ -288,6 +288,8 @@ format = '\[[$symbol$status]($style)\]'
 [fill]
 # 左右两段之间的连接符（已按你的选择定为 »）
 symbol = "»"
+# 默认样式是 bold black（比背景还暗、几乎看不见），换成柔和的浅灰
+style = "dimmed white"
 
 [time]
 disabled = false
