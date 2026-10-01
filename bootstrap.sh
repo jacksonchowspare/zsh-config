@@ -252,7 +252,8 @@ if [ "$NERD_OK" = 0 ] || { [ "$FONT_EXPLICIT" = 1 ] && [ "$FAMILY_OK" = 0 ]; }; 
         if command -v fc-cache >/dev/null 2>&1; then
           fc-cache -f >/dev/null 2>&1 && ok "字体缓存已重建"
         else
-          warn "没有 fc-cache，需要重新登录或重启桌面后系统才会认到新字体"
+          warn "没有 fc-cache（fontconfig 未装）：新字体要等重新登录或重启桌面才被系统认到"
+          warn "想立刻生效: sudo apt install -y fontconfig && fc-cache -f，然后重跑本脚本即可看到识别结果"
         fi
         if [ "$FCLIST_OK" = 1 ] && fc-list 2>/dev/null | grep -qi "$FONT_FAMILY"; then
           ok "系统已识别: $(fc-list 2>/dev/null | grep -i "$FONT_FAMILY" | head -1 | cut -d: -f2 | sed "s/^ *//")"
