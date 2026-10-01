@@ -41,14 +41,21 @@ setopt EXTENDED_GLOB
 unsetopt BEEP                  # 关掉蜂鸣
 
 # ── 4. 工具函数 ─────────────────────────────────────────────────
-# 插件加载器：可给多个候选路径，命中一个即用；全找不到只提示一行，不中断启动
+# 插件加载器：候选路径覆盖 Debian/Ubuntu、Arch、Fedora、macOS(Homebrew)；
+# 命中一个即用，全都没命中就在常见前缀里浅搜一遍，仍找不到只提示一行、不中断启动。
+# 用法: _zsh_load <包名> <文件名> <候选路径>...
 _zsh_load() {
-  local label=$1; shift
-  local f
+  local label=$1 fname=$2; shift 2
+  local f root
   for f in "$@"; do
     [[ -r $f ]] && { source "$f"; return 0; }
   done
-  print -u2 "⚠ 未找到 $label（可执行 sudo apt install $label 补上）"
+  for root in /usr/share /usr/local/share /opt/homebrew/share /opt/local/share; do
+    [[ -d $root ]] || continue
+    f=$(find "$root" -maxdepth 4 -name "$fname" -print -quit 2>/dev/null)
+    [[ -n $f && -r $f ]] && { source "$f"; return 0; }
+  done
+  print -u2 "⚠ 未找到 $label —— Debian/Ubuntu 可执行: sudo apt install $label"
   return 1
 }
 mkcd() { [[ -n $1 ]] || { print -u2 "用法: mkcd <目录>"; return 1; }; mkdir -p "$1" && cd "$1"; }
@@ -79,10 +86,20 @@ FZF_CTRL_T_OPTS='--preview "batcat --style=numbers --color=always --line-range=:
 if command -v fzf >/dev/null && [[ -t 0 ]]; then
   # [[ -t 0 ]]：只在真终端里装键位。非 tty 的交互式调用下，Debian 版 fzf 脚本
   # 会用 eval 恢复选项并试图打开 zle 选项，报 "can't change option: zle"，纯噪音。
-  for _f in /usr/share/doc/fzf/examples/key-bindings.zsh /usr/share/fzf/key-bindings.zsh; do
+  for _f in \
+    /usr/share/doc/fzf/examples/key-bindings.zsh \
+    /usr/share/fzf/shell/key-bindings.zsh \
+    /usr/share/fzf/key-bindings.zsh \
+    /opt/homebrew/opt/fzf/shell/key-bindings.zsh \
+    /usr/local/opt/fzf/shell/key-bindings.zsh; do
     [[ -r $_f ]] && { source "$_f"; break; }
   done
-  for _f in /usr/share/doc/fzf/examples/completion.zsh /usr/share/fzf/completion.zsh; do
+  for _f in \
+    /usr/share/doc/fzf/examples/completion.zsh \
+    /usr/share/fzf/shell/completion.zsh \
+    /usr/share/fzf/completion.zsh \
+    /opt/homebrew/opt/fzf/shell/completion.zsh \
+    /usr/local/opt/fzf/shell/completion.zsh; do
     [[ -r $_f ]] && { source "$_f"; break; }
   done
   unset _f
@@ -95,7 +112,10 @@ command -v zoxide >/dev/null && eval "$(zoxide init zsh)"
 ZSH_AUTOSUGGEST_STRATEGY=(history completion)
 ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE='fg=#6c6c6c'   # 暗色主题下的灰；浅色主题可改 darkgray
 ZSH_AUTOSUGGEST_USE_ASYNC=1
-_zsh_load zsh-autosuggestions /usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh
+_zsh_load zsh-autosuggestions zsh-autosuggestions.zsh \
+  /usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh \
+  /usr/share/zsh/plugins/zsh-autosuggestions/zsh-autosuggestions.zsh \
+  /opt/homebrew/share/zsh-autosuggestions/zsh-autosuggestions.zsh
 bindkey '^ ' autosuggest-accept                 # Ctrl+空格 采纳建议（右方向键也行）
 
 # ── 9. 别名 ─────────────────────────────────────────────────────
@@ -119,7 +139,10 @@ alias gp='git push'
 alias gl='git log --oneline --graph --decorate -20'
 
 # ── 10. 语法高亮（必须放在最后：它要包装所有 ZLE 小部件）────────
-_zsh_load zsh-syntax-highlighting /usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
+_zsh_load zsh-syntax-highlighting zsh-syntax-highlighting.zsh \
+  /usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh \
+  /usr/share/zsh/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh \
+  /opt/homebrew/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
 
 # ── 11. 提示符 ──────────────────────────────────────────────────
 # 优先用 starship（配置放在本仓库里：~/.config/zsh/starship.toml）；
