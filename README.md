@@ -45,7 +45,7 @@ bash bootstrap.sh --dry-run
 推荐：`fzf` `zoxide` `eza` `bat`（命令叫 `batcat`）`ripgrep` `fd-find`（命令叫 `fdfind`）
 字体：任意 Nerd Font（语言段的图标需要，例如 0xProto / JetBrainsMono Nerd Font）
 
-Arch/Fedora 上 `fd-find` 叫 `fd`；macOS 用 Homebrew，包名同样去掉 `-find`。缺哪个都不会让配置崩掉，只会少一项功能并给出提示。
+Arch/Fedora 上 `fd-find` 叫 `fd`；macOS 用 Homebrew，包名同样去掉 `-find`。Ubuntu 22.04 及更早的仓库里没有 `eza`（可改装 `exa`，配置会自动回退使用）。缺哪个都不会让配置崩掉，只会少一项功能并给出提示。
 
 ## 手动安装（不想用脚本）
 

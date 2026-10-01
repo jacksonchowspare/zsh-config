@@ -100,13 +100,34 @@ if [ "$DO_PKGS" = 0 ]; then
 elif [ -z "$PKG" ] || [ -z "$PKGS" ]; then
   warn "没识别出包管理器，请手动安装上面的依赖包"
 else
+  pkg_install() {
+    case "$PKG" in
+      apt-get) run sudo apt-get install -y "$@" ;;
+      dnf)     run sudo dnf install -y "$@" ;;
+      pacman)  run sudo pacman -S --needed --noconfirm "$@" ;;
+      zypper)  run sudo zypper install -y "$@" ;;
+      brew)    run brew install "$@" ;;
+    esac
+  }
+  PKGS_REQ="zsh zsh-syntax-highlighting zsh-autosuggestions"
   case "$PKG" in
-    apt-get) run sudo apt-get update; run sudo apt-get install -y $PKGS ;;
-    dnf)     run sudo dnf install -y $PKGS ;;
-    pacman)  run sudo pacman -S --needed --noconfirm $PKGS ;;
-    zypper)  run sudo zypper install -y $PKGS ;;
-    brew)    run brew install $PKGS ;;
+    apt-get|dnf) PKGS_OPT="fzf zoxide eza bat ripgrep fd-find fontconfig" ;;
+    *)           PKGS_OPT="fzf zoxide eza bat ripgrep fd fontconfig" ;;
   esac
+  case "$PKG" in apt-get) run sudo apt-get update ;; esac
+  say "   必需: $PKGS_REQ"
+  pkg_install $PKGS_REQ || warn "必需包没装上，请手动安装 zsh 与两个插件包"
+  say "   可选: $PKGS_OPT"
+  if ! pkg_install $PKGS_OPT; then
+    warn "整批可选包安装失败（多半是某些包在这个发行版上不存在），改为逐个安装、缺哪个跳哪个"
+    for _p in $PKGS_OPT; do
+      pkg_install "$_p" >/dev/null 2>&1 || warn "$_p 在这个发行版上装不上，跳过（不影响其它功能）"
+    done
+  fi
+  if ! command -v eza >/dev/null 2>&1; then
+    warn "没有 eza（Ubuntu 22.04 及更早的仓库里没有这个包）"
+    say "   可改用 exa: sudo apt install -y exa（配置里已内置 exa 回退，装了就能用现代版 ls）"
+  fi
 fi
 
 # ── 3. starship 可执行文件（放用户目录，不需要 sudo）─────────────

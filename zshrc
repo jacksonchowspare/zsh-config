@@ -112,11 +112,13 @@ command -v zoxide >/dev/null && eval "$(zoxide init zsh)"
 ZSH_AUTOSUGGEST_STRATEGY=(history completion)
 ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE='fg=#6c6c6c'   # 暗色主题下的灰；浅色主题可改 darkgray
 ZSH_AUTOSUGGEST_USE_ASYNC=1
-_zsh_load zsh-autosuggestions zsh-autosuggestions.zsh \
+if _zsh_load zsh-autosuggestions zsh-autosuggestions.zsh \
   /usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh \
   /usr/share/zsh/plugins/zsh-autosuggestions/zsh-autosuggestions.zsh \
-  /opt/homebrew/share/zsh-autosuggestions/zsh-autosuggestions.zsh
-bindkey '^ ' autosuggest-accept                 # Ctrl+空格 采纳建议（右方向键也行）
+  /opt/homebrew/share/zsh-autosuggestions/zsh-autosuggestions.zsh; then
+  # 只有插件真的加载成功才绑键：否则小部件不存在，语法高亮会报 unhandled ZLE widget
+  bindkey '^ ' autosuggest-accept               # Ctrl+空格 采纳建议（右方向键也行）
+fi
 
 # ── 9. 别名 ─────────────────────────────────────────────────────
 if command -v eza >/dev/null; then
@@ -124,6 +126,11 @@ if command -v eza >/dev/null; then
   alias ll='eza -lh --group-directories-first --git'
   alias la='eza -lah --group-directories-first --git'
   alias lt='eza --tree --level=2 --group-directories-first'
+elif command -v exa >/dev/null; then     # 老发行版（Ubuntu 22.04 等）仓库里只有 exa
+  alias ls='exa --group-directories-first'
+  alias ll='exa -lh --group-directories-first --git'
+  alias la='exa -lah --group-directories-first --git'
+  alias lt='exa --tree --level=2 --group-directories-first'
 fi
 command -v batcat >/dev/null && alias cat='batcat --style=plain --paging=never'
 command -v fdfind >/dev/null && alias fd='fdfind'
